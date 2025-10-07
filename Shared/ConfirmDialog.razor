@@ -1,0 +1,38 @@
+@using Blazorise
+
+<Modal @ref="_modal" Size="ModalSize.Small" Centered>
+    <ModalContent>
+        <ModalHeader><h5>Подтверждение</h5></ModalHeader>
+        <ModalBody>@_message</ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="Cancel">Отмена</Button>
+            <Button Color="Color.Danger" Clicked="Confirm">Да</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+@code {
+    private Modal? _modal;
+    private string _message = string.Empty;
+    private TaskCompletionSource<bool>? _tcs;
+
+    public async Task<bool> OpenAsync(string message)
+    {
+        _message = message;
+        _tcs = new TaskCompletionSource<bool>();
+        await _modal!.Show();
+        return await _tcs.Task;
+    }
+
+    private async Task Cancel()
+    {
+        _tcs?.SetResult(false);
+        await _modal!.Hide();
+    }
+
+    private async Task Confirm()
+    {
+        _tcs?.SetResult(true);
+        await _modal!.Hide();
+    }
+}

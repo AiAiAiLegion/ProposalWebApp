@@ -1,0 +1,192 @@
+@using Blazorise.DataGrid
+@using ProposalWebApp.Models
+@using ProposalWebApp.Shared.Filters
+
+@inject IMaterialsFacade Facade
+@inject ProposalWebApp.Services.Ui.IUiNotificationService Ui
+
+<Modal @ref="_modal" Class="custom-modal" Backdrop="Backdrop.True" Centered>
+    <ModalContent Centered>
+        <ModalHeader>
+            <h5>Материалы заявки №@_fullNumber</h5>
+        </ModalHeader>
+
+        <ModalBody>
+            <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+                <TextEdit Placeholder="Поиск (Наименование / Код / Комментарий)" @bind-Text="_filter.Search" />           
+                <Div Flex="Flex.Row">
+                    <Button Color="Color.Primary" Clicked="ApplyFilter">Применить</Button>
+                    <Button Color="Color.Danger"  Clicked="ClearFilter">Сбросить</Button>
+                </Div>
+            </div>
+
+            @if (_canEdit)
+            {
+                <Div Flex="Flex.JustifyContent.End" Margin="Margin.Is2.FromBottom">
+                    <Button Color="Color.Success" Clicked="CreateMaterial">Добавить материал</Button>
+                </Div>
+            }
+            <DataGrid TItem="ProposalMaterial"
+                      Data="@_materials"
+                      ReadData="OnReadData"
+                      TotalItems="@_totalCount"
+                      PageSize="10"
+                      ShowPager="true"
+                      Responsive="true"
+                      AutoGenerateColumns="false"
+                      RowSelectable="@((args) => false)">
+                <DataGridColumns>
+                    <DataGridColumn Field="@nameof(ProposalMaterial.Name)" Caption="Наименование" Sortable="false" />
+                    <DataGridColumn Field="@nameof(ProposalMaterial.Code)" Caption="Код" Sortable="false" />
+                    <DataGridColumn Field="@nameof(ProposalMaterial.Quantity)" Caption="Количество" Sortable="false" />
+                    <DataGridColumn Field="@nameof(ProposalMaterial.Comment)" Caption="Комментарий" Sortable="false" />
+                    <DataGridColumn Field="@nameof(ProposalMaterial.TextStatus)" Caption="Статус" Sortable="false" />
+
+                    <DataGridColumn Caption="Действия" Width="200px" Sortable="false">
+                        <DisplayTemplate Context="m">
+                            <div class="d-flex gap-3 justify-content-end">
+                                @if (_canEdit)
+                                {
+                                    <Button Color="Color.Link" Class="p-0" Clicked="@(() => EditMaterial(m))">Редактировать</Button>
+                                    <Button Color="Color.Link" Class="p-0 text-danger" Clicked="@(() => AskDelete(m))">Удалить</Button>
+                                }
+                            </div>
+                        </DisplayTemplate>
+                    </DataGridColumn>
+                </DataGridColumns>
+            </DataGrid>
+        </ModalBody>
+
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="Close">Закрыть</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+<MaterialEditModal @ref="_editModal" OnSaved="OnMaterialSaved" />
+<ConfirmDialog @ref="_confirmDialog" />
+
+@code {
+
+
+
+    private Modal? _modal;
+    private MaterialEditModal? _editModal;
+    private ConfirmDialog? _confirmDialog;
+
+    private List<ProposalMaterial> _materials = new();
+    private int _totalCount;
+    private int _proposalId;
+    private string _fullNumber = string.Empty;
+    private bool _canEdit;
+
+    private MaterialFilter _filter = new();
+    private IReadOnlyList<MaterialStatus> _statuses
+    {
+        get => _filter.Statuses;
+        set => _filter.Statuses = value.ToList();
+    }
+
+
+    public async Task OpenAsync(int proposalId, string fullNumber, bool canEdit)
+    {
+        _proposalId = proposalId;
+        _fullNumber = fullNumber ?? string.Empty;
+        _canEdit = canEdit;
+        _filter = new MaterialFilter();
+        await LoadPageAsync(1, 10);
+        await _modal!.Show();
+    }
+
+    private async Task Close() => await _modal!.Hide();
+
+    private async Task OnReadData(DataGridReadDataEventArgs<ProposalMaterial> e)
+    {
+        await LoadPageAsync(e.Page, e.PageSize);
+    }
+
+    private async Task LoadPageAsync(int page, int pageSize)
+    {
+        try
+        {
+            var (items, total) = await Facade.GetPagedAsync(_proposalId, _filter, page, pageSize);
+            _materials = items ?? new List<ProposalMaterial>();
+            _totalCount = total;
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            await Ui.ShowError("Ошибка при загрузке материалов");
+            _materials = new List<ProposalMaterial>();
+            _totalCount = 0;
+        }
+    }
+
+    private async Task ApplyFilter() => await LoadPageAsync(1, 10);
+
+    private async Task ClearFilter() { _filter.Search = null; _filter.Statuses.Clear(); await LoadPageAsync(1, 10); }
+
+    private async void CreateMaterial()
+    {
+        var m = new ProposalMaterial
+        {
+            ProposalId = _proposalId,
+            Status = MaterialStatus.Created,
+            Quantity = 1
+        };
+        await _editModal!.Open(m);
+    }
+
+    private async void EditMaterial(ProposalMaterial m)
+    {
+        if (_editModal is not null) await _editModal.Open(m);
+    }
+
+    private async Task AskDelete(ProposalMaterial m)
+    {
+        if (_confirmDialog is null) return;
+
+        var ok = await _confirmDialog.OpenAsync($"Удалить материал «{m.Name}»?");
+        if (!ok) return;
+
+        try
+        {
+            var success = await Facade.DeleteAsync(m);
+            if (success)
+            {
+                
+                await LoadPageAsync(1, 10);
+            }
+            else
+            {
+                await Ui.ShowError("Не удалось удалить материал");
+            }
+        }
+        catch (Exception)
+        {
+            await Ui.ShowError("Ошибка при удалении");
+        }
+    }
+
+    private async Task OnMaterialSaved(ProposalMaterial saved)
+    {
+        
+        await LoadPageAsync(1, 10);
+    }
+
+
+    private void OnStatusChanged(MaterialStatus status, bool isChecked)
+    {
+        if (isChecked && !_filter.Statuses.Contains(status))
+            _filter.Statuses.Add(status);
+        else if (!isChecked)
+            _filter.Statuses.Remove(status);
+    }
+
+    private string GetStatusText(MaterialStatus s) => s switch
+    {
+        MaterialStatus.Created => "Создан",
+        MaterialStatus.Deleted => "Удален",
+        _ => s.ToString()
+    };
+}

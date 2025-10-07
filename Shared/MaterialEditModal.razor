@@ -1,0 +1,128 @@
+@using ProposalWebApp.Models
+@inject IMaterialsFacade Facade
+@inject ProposalWebApp.Services.Ui.IUiNotificationService Ui
+
+<Modal @ref="_modal" Size="ModalSize.Small" Centered Backdrop="Backdrop.True">
+    <ModalContent Centered>
+        <ModalHeader>
+            <h5>@(_isEdit ? "Редактировать материал" : "Создать материал")</h5>
+        </ModalHeader>
+
+        <ModalBody>
+            <div class="mb-2">
+                <TextEdit Placeholder="Наименование" @bind-Text="_model.Name" />
+            </div>
+            <div class="mb-2">
+                <TextEdit Placeholder="Код (до 10 символов)" @bind-Text="_model.Code" />
+            </div>
+            <div class="mb-2">
+                <NumericEdit TValue="int" @bind-Value="_model.Quantity" Min="1" />
+            </div>
+            <div class="mb-2">
+                <TextEdit Placeholder="Комментарий" @bind-Text="_model.Comment" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(_validationMessage))
+            {
+                <div class="text-danger small">@_validationMessage</div>
+            }
+        </ModalBody>
+
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="Cancel">Отмена</Button>
+            <Button Color="Color.Primary" Clicked="Save">Сохранить</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+@code {
+    private Modal? _modal;
+    private ProposalMaterial _model = new();
+    private bool _isEdit;
+    private string _validationMessage = string.Empty;
+
+    
+    [Parameter] public EventCallback<ProposalMaterial> OnSaved { get; set; }
+
+    
+    public async Task Open(ProposalMaterial item)
+    {
+        
+        _model = new ProposalMaterial
+        {
+            Id = item.Id,
+            ProposalId = item.ProposalId,
+            Name = item.Name ?? string.Empty,
+            Code = item.Code ?? string.Empty,
+            Quantity = item.Quantity <= 0 ? 1 : item.Quantity,
+            Comment = item.Comment,
+            Status = item.Status
+        };
+
+        _isEdit = _model.Id != 0;
+        _validationMessage = string.Empty;
+        await _modal!.Show();
+    }
+
+    private async Task Cancel()
+    {
+        _validationMessage = string.Empty;
+        await _modal!.Hide();
+    }
+
+    private bool Validate()
+    {
+        _validationMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(_model.Name))
+        {
+            _validationMessage = "Наименование обязательно";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(_model.Code) || _model.Code.Length > 10)
+        {
+            _validationMessage = "Код обязателен и до 10 символов";
+            return false;
+        }
+
+        if (_model.Quantity < 1)
+        {
+            _validationMessage = "Количество должно быть >= 1";
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task Save()
+    {
+        if (!Validate())
+            return;
+
+        if (_isEdit)
+        {
+            var ok = await Facade.UpdateAsync(_model);
+            if (!ok)
+            {
+                await Ui.ShowError("Не удалось обновить материал.");
+                return;
+            }
+
+            await _modal!.Hide();
+            await OnSaved.InvokeAsync(_model);
+        }
+        else
+        {
+            var created = await Facade.CreateAsync(_model);
+            if (created == null)
+            {
+                await Ui.ShowError("Не удалось создать материал.");
+                return;
+            }
+
+            await _modal!.Hide();
+            await OnSaved.InvokeAsync(created);
+        }
+    }
+}

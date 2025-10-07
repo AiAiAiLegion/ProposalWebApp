@@ -1,0 +1,224 @@
+@page "/proposals"
+
+@using ProposalWebApp.Models
+@using ProposalWebApp.Facades
+@using ProposalWebApp.Shared.Filters
+@using System.Text;
+
+@inject IProposalsFacade ProposalsFacade
+@inject ProposalWebApp.Services.Ui.IUiNotificationService Ui
+
+@inject NavigationManager Nav
+
+<PageTitle>Список заявок</PageTitle>
+
+<h4 class="mb-3">Список заявок</h4>
+
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <TextEdit TValue="string" Placeholder="Поиск (№ / Автор / Подразделение)" @bind-Text="_filter.Search" />
+        <DateEdit TValue="DateTime?" @bind-Date="@_filter.FromDate" Placeholder="С даты" />
+        <DateEdit TValue="DateTime?" @bind-Date="@_filter.ToDate" Placeholder="По дату" />
+
+        <Field>
+            <FieldLabel>Статус:</FieldLabel>
+            <FieldBody>
+                @foreach (var status in Enum.GetValues<ProposalStatus>())
+                {
+                    if (status != ProposalStatus.Deleted)
+                    {
+                        <Check TValue="bool"
+                            Checked="_filter.Statuses.Contains(status)"
+                            CheckedChanged=@(c => OnStatusChanged(status, c))>
+                            @GetStatusText(status)
+                        </Check>
+                    }
+                }
+            </FieldBody>
+        </Field>
+
+        <Div Flex="Flex.Column">
+            <Button Color="Color.Primary" Clicked="ApplyFilter">Применить</Button>
+            <Button Color="Color.Danger"  Clicked="ClearFilter">Сбросить</Button>
+        </Div>
+    </div>
+</div>
+
+<Div Class="d-flex w-100 align-items-center mb-3">
+    <Div Class="align-right">
+        <Button Color="Color.Success" Size="Size.Small" Clicked="CreateProposal">
+            <Blazorise.Icon Name="FontAwesomeIcons.Plug" /> Создать
+        </Button>
+    </Div>
+</Div>
+
+<DataGrid TItem="Proposal"
+          Data="@_proposals"
+          TotalItems="@_total"
+          ReadData="OnReadDataAsync"
+          PageSize="@_pageSize"
+          ShowPager
+          Responsive
+          AutoGenerateColumns="false"
+          RowSelectable="@((args) => false)">
+    <DataGridColumns>
+        <DataGridColumn Field="@nameof(Proposal.FullNumber)" Caption="№ заявки" Sortable="false"/>
+        <DataGridColumn Field="@nameof(Proposal.Author)" Caption="Автор" Sortable="false" />
+        <DataGridColumn Field="@nameof(Proposal.Department)" Caption="Подразделение" Sortable="false" />
+        <DataGridColumn Field="@nameof(Proposal.CreatedAt)" Caption="Дата" DisplayFormat="{0:dd.MM.yyyy}" Sortable="false" />
+        <DataGridColumn Field="@nameof(Proposal.TextStatus)" Caption="Статус" Sortable="false" />
+
+        <DataGridColumn Caption="Действия" Width="250px" Sortable="false">
+            <DisplayTemplate>
+                <div class="d-flex gap-3 justify-content-start">
+                    <Button Color="Color.Link" Class="p-0 text-primary"
+                            Clicked="@(() => EditProposal(context))">
+                        Редактировать
+                    </Button>
+
+                    <Button Color="Color.Link" Class="p-0 text-info"
+                            Clicked="@(() => OpenDetails(context))">
+                        Подробнее
+                    </Button>
+
+                    @if (context.Status == ProposalStatus.Created)
+                    {
+                        <Button Color="Color.Link" Class="p-0 text-danger"
+                                Clicked="@(() => AskDelete(context))">
+                            Удалить
+                        </Button>
+                    }
+                </div>
+            </DisplayTemplate>
+        </DataGridColumn>
+    </DataGridColumns>
+</DataGrid>
+
+<ProposalEditModal @ref="_editModal" OnSave="OnSavedAsync" />
+<ConfirmDialog @ref="_confirmDialog" />
+
+@code {
+
+    private ProposalEditModal? _editModal;
+    private ConfirmDialog? _confirmDialog;
+
+    private ProposalFilter _filter = new();
+    private List<Proposal> _proposals = new();
+    private int _total;
+    private int _pageSize = 20;
+
+    private IReadOnlyList<ProposalStatus> _statuses
+    {
+        get => _filter.Statuses;
+        set => _filter.Statuses = value.ToList();
+    }
+
+
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task OnReadDataAsync(DataGridReadDataEventArgs<Proposal> e)
+        => await ReloadAsync(e.Page, e.PageSize);
+    
+    private async Task ReloadAsync(int page = 1, int size = 20)
+    {
+        var (items, total) = await ProposalsFacade.GetPagedAsync(_filter, page, size);
+        _proposals = items;
+        _total = total;
+    }
+
+    private async Task ApplyFilter() => await ReloadAsync();
+    private async Task ClearFilter() 
+    { 
+        _filter.Search = null; 
+        _filter.Statuses.Clear();
+        _filter.FromDate = null;
+        _filter.ToDate = null;
+
+        await ReloadAsync(1, 20); 
+    }
+
+    private async Task OnSavedAsync(Proposal proposal)
+    {
+        if(string.IsNullOrEmpty(proposal.Department) ||
+                string.IsNullOrEmpty(proposal.Author))
+        {
+            return;
+        }
+
+        if (proposal.Id == 0)
+        {
+            var created = await ProposalsFacade.CreateAsync(proposal);
+            if (created != null)
+                await ReloadAsync();
+        }
+        else
+        {
+            var updated = await ProposalsFacade.UpdateAsync(proposal);
+            if (updated)
+                await ReloadAsync();
+        }
+    }
+
+    private async Task EditProposal(Proposal proposal)
+    {
+        var editable = await ProposalsFacade.GetByIdAsync(proposal.Id);
+        if (editable != null)
+            await _editModal!.OpenAsync(editable);
+    }
+
+    private async Task CreateProposal()
+    {
+        var newProposal = new Proposal
+        {
+            CreatedAt = DateTime.Now,
+            Status = ProposalStatus.Created
+        };
+        await _editModal!.OpenAsync(newProposal);
+    }
+
+    private void OpenDetails(Proposal proposal)
+        => Nav.NavigateTo(Routes.ProposalDetails(proposal.Id));
+
+    private async Task AskDelete(Proposal proposal)
+    {
+        if (_confirmDialog is null) return;
+
+        var ok = await _confirmDialog.OpenAsync($"Удалить заявку «{proposal.FullNumber}»?");
+        if (!ok) return;
+
+        try
+        {
+            var success = await ProposalsFacade.DeleteAsync(proposal);
+            if (success)
+            {
+                await ReloadAsync();
+            }
+            else
+            {
+                await Ui.ShowError("Не удалось удалить заявку");
+            }
+        }
+        catch (Exception ex)
+        {
+            await Ui.ShowError("Ошибка при удалении: " + ex.Message);
+        }
+    }
+    
+    private void OnStatusChanged(ProposalStatus status, bool isChecked)
+    {
+        if (isChecked && !_filter.Statuses.Contains(status))
+            _filter.Statuses.Add(status);
+        else if (!isChecked)
+            _filter.Statuses.Remove(status);
+    }
+
+    private string GetStatusText(ProposalStatus s) => s switch
+    {
+        ProposalStatus.Created => "Создана",
+        ProposalStatus.Approved => "Утверждена",
+        ProposalStatus.Deleted => "Удалена",
+        _ => s.ToString()
+    };
+
+}

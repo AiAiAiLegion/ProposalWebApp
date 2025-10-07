@@ -1,0 +1,35 @@
+#blazor-error-ui {
+    display: none !important;
+}
+
+.box {
+    flex-direction: column;
+}
+
+/* только для модалок, у которых есть класс custom-modal */
+.custom-modal .modal-dialog {
+    max-width: 1200px !important; /* нужная ширина */
+    width: 95vw !important;
+    margin: 1.75rem auto !important;
+}
+
+.custom-modal .modal-content {
+    min-height: 75vh !important; /* желаемая высота */
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.custom-modal .modal-body {
+    overflow: auto !important;
+    flex: 1 1 auto !important;
+}
+
+/* если нужен ещё больший приоритет — используем body scope */
+body .custom-modal .modal-dialog {
+    max-width: 1200px !important;
+}
+
+.align-right {
+    margin-left: auto !important;
+    display: flex !important;
+}

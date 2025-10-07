@@ -1,0 +1,75 @@
+@using ProposalWebApp.Models
+@using Blazorise
+
+<Modal @ref="_modal" Size="ModalSize.Small" Centered Backdrop="Backdrop.True">
+    <ModalContent Centered>
+        <ModalHeader>
+            <h5>@(_model.Id == 0 ? "Создать заявку" : "Редактировать заявку")</h5>
+        </ModalHeader>
+
+        <ModalBody>
+            <Validations @ref="_validations" Mode="ValidationMode.Auto">
+
+                <Validation Validator="ValidationRule.IsNotEmpty">
+                    <Field>
+                        <FieldLabel>Автор</FieldLabel>
+                        <TextEdit TValue="string"
+                                  @bind-Text="_model.Author"
+                                  Placeholder="Введите автора"
+                                  MaxLength="100" />
+                    </Field>
+                </Validation>
+
+                <Validation Validator="ValidationRule.IsNotEmpty">
+                    <Field>
+                        <FieldLabel>Подразделение</FieldLabel>
+                        <TextEdit TValue="string"
+                                  @bind-Text="_model.Department"
+                                  Placeholder="Введите подразделение"
+                                  MaxLength="100"/>
+                    </Field>
+                </Validation>
+
+            </Validations>
+        </ModalBody>
+
+        <ModalFooter>
+            <Button Color="Color.Secondary" Clicked="Cancel">Отмена</Button>
+            <Button Color="Color.Primary" Clicked="Save">Сохранить</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+@code {
+    private Modal? _modal;
+    private Validations? _validations;
+    private Proposal _model = new();
+
+    [Parameter] public EventCallback<Proposal> OnSave { get; set; }
+
+    public async Task OpenAsync(Proposal model)
+    {
+        _model = new Proposal
+        {
+            Id = model.Id,
+            Number = model.Number,
+            CreatedAt = model.CreatedAt == default ? DateTime.UtcNow : model.CreatedAt,
+            Status = model.Status,
+            Author = model.Author,
+            Department = model.Department
+        };
+
+        await _modal!.Show();
+    }
+
+    private async Task Cancel() => await _modal!.Hide();
+
+    private async Task Save()
+    {
+        if (_validations != null && !await _validations.ValidateAll())
+           return;
+
+        await OnSave.InvokeAsync(_model);
+        await _modal!.Hide();
+    }
+}

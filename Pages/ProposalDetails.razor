@@ -1,0 +1,82 @@
+@page "/proposal/{Id:int}"
+
+@using ProposalWebApp.Models
+@using ProposalWebApp.Facades
+
+@inject IProposalDetailsFacade ProposalDetailsFacade
+@inject NavigationManager Nav
+
+<PageTitle>Детали заявки</PageTitle>
+
+@if (_proposal is null)
+{
+    <p>Загрузка...</p>
+}
+else
+{
+    <Card Class="mb-4" Style="max-width: 1500px; margin: 0 auto; float: none;">
+        <CardHeader TextAlignment="TextAlignment.Center">
+            <h5>Заявка № @_proposal.FullNumber</h5>
+        </CardHeader>
+        <CardBody TextAlignment="TextAlignment.Center">
+            <p><strong>Автор:</strong> @_proposal.Author</p>
+            <p><strong>Подразделение:</strong> @_proposal.Department</p>
+            <p><strong>Дата создания:</strong> @_proposal.CreatedAt.ToString("dd.MM.yyyy")</p>
+            <p><strong>Статус:</strong> @_proposal.TextStatus</p>
+        </CardBody>
+        <CardFooter>
+            <div class="d-flex gap-3">
+                <Button Color="Color.Primary" Clicked="EditProposal">Редактировать</Button>
+                <Button Color="Color.Primary" Clicked=@(async () => await _materialsModal!.OpenAsync(_proposal.Id, _proposal.FullNumber, _proposal.Status == ProposalStatus.Created))>Материалы</Button>
+                @if (_proposal.Status == ProposalStatus.Created)
+                {
+                    <Button Color="Color.Success" Clicked="ApproveProposal">Утвердить</Button>
+                    <Button Color="Color.Danger" Clicked="DeleteProposal">Удалить</Button>
+                }
+                <Button Color="Color.Secondary" Clicked="BackToList">Назад</Button>
+            </div>
+        </CardFooter>
+    </Card>
+}
+
+<ProposalEditModal @ref="_editModal" OnSave="OnSavedAsync" />
+<MaterialsModal @ref="_materialsModal" />
+
+@code {
+
+
+
+    [Parameter] public int Id { get; set; }
+    private Proposal? _proposal;
+    private ProposalEditModal? _editModal;
+
+    private MaterialsModal? _materialsModal;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => _proposal = await ProposalDetailsFacade.GetByIdAsync(Id);
+
+
+
+    private async Task OnSavedAsync(Proposal p) 
+    { 
+        await ProposalDetailsFacade.UpdateAsync(p);
+        await LoadAsync(); 
+    }
+
+    private async Task EditProposal() => await _editModal!.OpenAsync(_proposal!);
+
+    private async Task ApproveProposal()
+    {
+        await ProposalDetailsFacade.ApproveAsync(_proposal!);
+        await LoadAsync();
+    }
+
+    private async Task DeleteProposal()
+    {
+        await ProposalDetailsFacade.DeleteAsync(_proposal!);
+        Nav.NavigateTo("/proposals");
+    }
+
+    private void BackToList() => Nav.NavigateTo(Routes.Proposals);
+}

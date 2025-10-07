@@ -1,0 +1,33 @@
+@inject IUiNotificationService UiNotifier
+
+<Modal @bind-Visible="IsVisible" Centered Size="ModalSize.Default" Scrollable="true">
+    <ModalContent Centered>
+        <ModalHeader>Ошибка</ModalHeader>
+        <ModalBody>
+            <p>@Message</p>
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Danger" Clicked="Close">Закрыть</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+@code {
+    private bool IsVisible { get; set; }
+    private string? Message { get; set; }
+
+    protected override void OnInitialized()
+    {
+        UiNotifier.OnError += ShowError;
+    }
+
+    private Task ShowError(string message)
+    {
+        Message = message;
+        IsVisible = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void Close() => IsVisible = false;
+}
