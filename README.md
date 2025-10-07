@@ -66,15 +66,21 @@
 
 <h3 align="center"> Proposals.razor </h3>
 
-<img width="3436" height="1230" alt="image" src="https://github.com/user-attachments/assets/937cf57d-d348-4d3a-8064-f5641ee09b8b" />
+<img width="3436" height="1230" alt="image" src="https://github.com/user-attachments/assets/f2768768-33cc-4f6f-9909-3b8c188060fa" />
+
+
 \
-<img width="3439" height="524" alt="image" src="https://github.com/user-attachments/assets/42b10cad-8dc4-4410-b231-010b51d44fb0" />
+<img width="3439" height="524" alt="image" src="https://github.com/user-attachments/assets/c9108ded-b133-4391-bcff-f4ec9a8af301" />
+
 
 <h3 align="center"> ProposalDetails.razor </h3>
 
-<img width="1766" height="499" alt="image" src="https://github.com/user-attachments/assets/a5c41fbb-0737-4152-9f2b-4ad7b3e50f1a" />
+<img width="1766" height="499" alt="image" src="https://github.com/user-attachments/assets/1fdc5898-68f7-4525-8366-a4af5b661784" />
+
+
 
 <h3 align="center"> MaterialsModal.razor </h3>
 
-<img width="959" height="952" alt="image" src="https://github.com/user-attachments/assets/f8308dcf-b0ac-4360-9a46-567e4b904f6b" />
+<img width="959" height="952" alt="image" src="https://github.com/user-attachments/assets/e59be5b6-b634-407c-92db-d881ba5e728d" />
+
 
